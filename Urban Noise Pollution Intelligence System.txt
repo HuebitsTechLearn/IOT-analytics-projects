@@ -1,0 +1,186 @@
+import React, { useState, useEffect } from 'react';
+
+// Define noise level categories and their associated colors
+const NOISE_CATEGORIES = {
+  VERY_QUIET: { label: 'Very Quiet', min: 0, max: 40, color: 'bg-green-600' },
+  QUIET: { label: 'Quiet', min: 41, max: 55, color: 'bg-green-400' },
+  MODERATE: { label: 'Moderate', min: 56, max: 70, color: 'bg-yellow-500' },
+  LOUD: { label: 'Loud', min: 71, max: 85, color: 'bg-orange-500' },
+  VERY_LOUD: { label: 'Very Loud', min: 86, max: 100, color: 'bg-red-600' },
+  EXTREME: { label: 'Extreme', min: 101, max: 120, color: 'bg-purple-700' }, // For spikes
+};
+
+// Simulate a city grid of noise sensors
+const NUM_ROWS = 6;
+const NUM_COLS = 8;
+const TOTAL_SENSORS = NUM_ROWS * NUM_COLS;
+
+// Initial state for all sensors
+const initialSensors = Array.from({ length: TOTAL_SENSORS }).map((_, index) => ({
+  id: `sensor-${index + 1}`,
+  dbLevel: Math.floor(Math.random() * 30) + 40, // Start with moderate noise (40-70 dB)
+  zone: `Zone ${Math.floor(index / 10) + 1}`,
+}));
+
+// Main App component for the Noise Pollution Dashboard
+function App() {
+  const [sensors, setSensors] = useState(initialSensors);
+  const [overallAvgDb, setOverallAvgDb] = useState(0);
+  const [noiseAlert, setNoiseAlert] = useState(null); // For sudden spikes
+
+  /**
+   * Generates a random noise level for simulation, with occasional spikes.
+   * In a real system, this comes from ESP32 + FFT processing.
+   */
+  const generateRandomDbLevel = (currentDb) => {
+    // Simulate a gentle fluctuation around current level
+    let newDb = currentDb + (Math.random() * 10 - 5); // +/- 5 dB
+    newDb = Math.max(0, Math.min(120, newDb)); // Keep within realistic range
+
+    // Introduce occasional random spikes (e.g., 5% chance)
+    if (Math.random() < 0.05) {
+      newDb = Math.floor(Math.random() * 20) + 90; // Spike to 90-110 dB
+    }
+    return Math.floor(newDb);
+  };
+
+  /**
+   * Determines the noise category and color based on dB level.
+   */
+  const getNoiseCategory = (db) => {
+    for (const key in NOISE_CATEGORIES) {
+      const category = NOISE_CATEGORIES[key];
+      if (db >= category.min && db <= category.max) {
+        return category;
+      }
+    }
+    return NOISE_CATEGORIES.VERY_QUIET; // Default if out of defined range (shouldn't happen with clamping)
+  };
+
+  /**
+   * Updates sensor data and calculates overall average.
+   */
+  useEffect(() => {
+    const updateSensorData = () => {
+      setSensors(prevSensors => {
+        const updatedSensors = prevSensors.map(sensor => {
+          const newDb = generateRandomDbLevel(sensor.dbLevel);
+          return { ...sensor, dbLevel: newDb };
+        });
+
+        // Calculate overall average dB
+        const totalDb = updatedSensors.reduce((sum, sensor) => sum + sensor.dbLevel, 0);
+        const avgDb = totalDb / TOTAL_SENSORS;
+        setOverallAvgDb(avgDb.toFixed(1));
+
+        // Check for severe noise spikes and set an alert
+        const maxDbInCurrentCycle = Math.max(...updatedSensors.map(s => s.dbLevel));
+        if (maxDbInCurrentCycle >= NOISE_CATEGORIES.VERY_LOUD.min) {
+            const noisySensor = updatedSensors.find(s => s.dbLevel === maxDbInCurrentCycle);
+            setNoiseAlert(`HIGH NOISE SPIKE: ${maxDbInCurrentCycle} dB detected at ${noisySensor.zone} (Sensor ${noisySensor.id.split('-')[1]})!`);
+            // Clear alert after a few seconds
+            setTimeout(() => setNoiseAlert(null), 5000);
+        }
+
+        return updatedSensors;
+      });
+    };
+
+    // Run initial update and then set interval
+    updateSensorData();
+    const interval = setInterval(updateSensorData, 3000); // Update every 3 seconds
+
+    return () => clearInterval(interval); // Cleanup on component unmount
+  }, []); // Empty dependency array means this effect runs once on mount
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-gray-100 font-inter p-4 sm:p-8 rounded-lg shadow-xl">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <script src="https://cdn.tailwindcss.com"></script>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+      {/* Header Section */}
+      <header className="text-center mb-8">
+        <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-600 mb-2">
+          Urban Noise Pollution Intelligence System
+        </h1>
+        <p className="text-lg text-gray-300">Real-time Noise Mapping & Pattern Analysis for Quieter Cities</p>
+      </header>
+
+      {/* Overall Noise Level & Alert */}
+      <section className="mb-8 p-6 rounded-lg shadow-xl bg-gray-800 border border-teal-700">
+        <h2 className="text-2xl sm:text-3xl font-bold mb-3 text-center text-teal-300">
+          Overall City Average: <span className="text-teal-400">{overallAvgDb} dB</span>
+        </h2>
+        {noiseAlert && (
+          <div className="mt-4 p-4 bg-red-600 text-white rounded-md text-center text-lg font-semibold animate-pulse">
+            {noiseAlert}
+          </div>
+        )}
+        {!noiseAlert && (
+            <p className="text-xl text-center text-gray-200">
+                Current noise levels are within expected ranges.
+            </p>
+        )}
+      </section>
+
+      {/* Noise Heatmap Grid */}
+      <section className="mb-8 p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+        <h2 className="text-2xl font-bold text-gray-200 mb-4 text-center">Live Noise Heatmap (dB)</h2>
+        <div
+          className="grid gap-2 mx-auto"
+          style={{
+            gridTemplateColumns: `repeat(${NUM_COLS}, minmax(0, 1fr))`,
+            width: 'fit-content'
+          }}
+        >
+          {sensors.map(sensor => (
+            <div
+              key={sensor.id}
+              className={`w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center text-xs sm:text-sm
+                text-white font-semibold rounded-lg shadow-md transition-colors duration-500
+                ${getNoiseCategory(sensor.dbLevel).color}`}
+              title={`${sensor.id} - ${sensor.zone}\nNoise: ${sensor.dbLevel} dB (${getNoiseCategory(sensor.dbLevel).label})`}
+            >
+              {sensor.dbLevel}
+            </div>
+          ))}
+        </div>
+        <p className="text-center text-gray-400 text-sm mt-4">Hover over cells for detailed noise levels and zone info.</p>
+      </section>
+
+      {/* Noise Category Legend */}
+      <section className="mb-8 p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+        <h2 className="text-2xl font-bold text-gray-200 mb-4 text-center">Noise Level Categories</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm text-center">
+          {Object.values(NOISE_CATEGORIES).map(category => (
+            <div key={category.label} className={`p-3 rounded-md text-white font-semibold ${category.color}`}>
+              {category.label} ({category.min}-{category.max} dB)
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* System Information / Disclaimer */}
+      <section className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-gray-400 text-sm italic">
+        <h3 className="text-lg font-semibold mb-2 text-gray-200">System Information:</h3>
+        <p>
+          This dashboard provides a conceptual simulation of an Urban Noise Pollution Intelligence System.
+          In a complete system, MEMS microphones on ESP32 microcontrollers would capture audio, perform
+          real-time FFT processing to calculate dB levels, and send this data to a central Python backend.
+          The Streamlit dashboard would then display live noise heatmaps and analytics.
+        </p>
+        <p className="mt-2 text-xs">
+          <span className="font-bold">Disclaimer:</span> This is a simulated environment and does not reflect actual noise pollution data.
+        </p>
+      </section>
+
+      {/* Footer Section */}
+      <footer className="text-center mt-8 text-gray-500 text-sm">
+        <p>&copy; {new Date().getFullYear()} Urban Noise Pollution Intelligence System. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
