@@ -1,0 +1,256 @@
+import React, { useState, useEffect } from 'react';
+
+// Define thresholds and categories for environmental factors
+const CO2_THRESHOLDS = {
+  GOOD: 800,
+  MODERATE: 1200,
+  HIGH: 1800,
+};
+
+const NOISE_THRESHOLDS = {
+  QUIET: 45,
+  MODERATE: 60,
+  LOUD: 75,
+};
+
+const LUX_THRESHOLDS = {
+  DIM: 150,
+  OPTIMAL: 400,
+  BRIGHT: 700,
+};
+
+const TEMP_THRESHOLDS = {
+  COOL: 20,
+  OPTIMAL: 23,
+  WARM: 26,
+};
+
+// Main App component for the Smart Classroom Dashboard
+function App() {
+  // State variables for simulated sensor data
+  const [temperature, setTemperature] = useState(22); // Celsius
+  const [co2, setCo2] = useState(650); // ppm
+  const [lux, setLux] = useState(350); // Lux
+  const [noiseDb, setNoiseDb] = useState(40); // dB
+
+  // State for calculated comfort/focus index and messages
+  const [comfortIndex, setComfortIndex] = useState({ level: 'Excellent', message: 'Conditions are ideal for focus and learning.' });
+  const [alertMessage, setAlertMessage] = useState(null);
+
+  /**
+   * Simulates real-time sensor data updates.
+   * In a real system, this data would be streamed from edge devices (ESP32)
+   * to Azure IoT Hub and then to the frontend.
+   */
+  useEffect(() => {
+    const dataInterval = setInterval(() => {
+      // Simulate gradual changes and occasional spikes
+      const newTemp = parseFloat((temperature + (Math.random() * 2 - 1)).toFixed(1)); // +/- 1 C
+      const newCo2 = Math.floor(co2 + (Math.random() * 200 - 100)); // +/- 100 ppm
+      const newLux = Math.floor(lux + (Math.random() * 80 - 40)); // +/- 40 Lux
+      const newNoiseDb = Math.floor(noiseDb + (Math.random() * 10 - 5)); // +/- 5 dB
+
+      // Clamp values within realistic ranges
+      setTemperature(Math.max(18, Math.min(30, newTemp)));
+      setCo2(Math.max(400, Math.min(2500, newCo2)));
+      setLux(Math.max(50, Math.min(1000, newLux)));
+      setNoiseDb(Math.max(30, Math.min(90, newNoiseDb)));
+
+      // Recalculate comfort index and check for alerts
+      const currentComfort = calculateComfortIndex(newTemp, newCo2, newLux, newNoiseDb);
+      setComfortIndex(currentComfort.comfort);
+      setAlertMessage(currentComfort.alert);
+
+    }, 3000); // Update every 3 seconds
+
+    // Initial calculation on mount
+    const initialComfort = calculateComfortIndex(temperature, co2, lux, noiseDb);
+    setComfortIndex(initialComfort.comfort);
+    setAlertMessage(initialComfort.alert);
+
+    // Clear interval on component unmount
+    return () => clearInterval(dataInterval);
+  }, [temperature, co2, lux, noiseDb]); // Re-run effect if sensor values change (for initial calc)
+
+  /**
+   * Calculates a simplified Classroom Comfort & Focus Index based on environmental parameters.
+   * In a real system, this would be a complex ML model on Azure Machine Learning.
+   * @param {number} temp - Temperature in Celsius.
+   * @param {number} co2 - CO2 levels in ppm.
+   * @param {number} lux - Light levels in Lux.
+   * @param {number} noise - Noise level in dB.
+   * @returns {{comfort: {level: string, message: string}, alert: string|null}}
+   */
+  const calculateComfortIndex = (temp, co2Val, luxVal, noiseVal) => {
+    let comfortScore = 100; // Start with perfect score
+    let messages = [];
+    let alert = null;
+
+    // Evaluate Temperature
+    if (temp < TEMP_THRESHOLDS.COOL) {
+      comfortScore -= 15;
+      messages.push('Temperature is a bit too cool. Consider increasing.');
+    } else if (temp > TEMP_THRESHOLDS.WARM) {
+      comfortScore -= 20;
+      messages.push('Temperature is getting warm. May cause drowsiness.');
+    } // Optimal range (20-26 C) gives no penalty
+
+    // Evaluate CO2
+    if (co2Val > CO2_THRESHOLDS.HIGH) {
+      comfortScore -= 40;
+      messages.push('CRITICAL CO2: Levels are very high! Immediate ventilation needed for alertness.');
+      alert = 'High CO2 levels detected! Open windows or activate ventilation.';
+    } else if (co2Val > CO2_THRESHOLDS.MODERATE) {
+      comfortScore -= 25;
+      messages.push('Elevated CO2: Air quality is decreasing. Affects concentration.');
+      if (!alert) alert = 'CO2 levels rising. Consider ventilation.';
+    } else if (co2Val > CO2_THRESHOLDS.GOOD) {
+      comfortScore -= 10;
+      messages.push('CO2 levels are moderate. Keep an eye on ventilation.');
+    }
+
+    // Evaluate Lux
+    if (luxVal < LUX_THRESHOLDS.DIM) {
+      comfortScore -= 20;
+      messages.push('Lighting is dim. May cause eye strain and reduced alertness.');
+    } else if (luxVal > LUX_THRESHOLDS.BRIGHT) {
+      comfortScore -= 10;
+      messages.push('Lighting is very bright. May cause discomfort.');
+    } // Optimal range (150-700 Lux) gives no penalty
+
+    // Evaluate Noise
+    if (noiseVal > NOISE_THRESHOLDS.LOUD) {
+      comfortScore -= 35;
+      messages.push('HIGH NOISE: Significant distractions present! Address noise source.');
+      alert = 'High noise levels detected! Minimize disturbances.';
+    } else if (noiseVal > NOISE_THRESHOLDS.MODERATE) {
+      comfortScore -= 15;
+      messages.push('Moderate noise levels. May cause minor distractions.');
+    }
+
+    // Determine overall comfort level based on score
+    let level = 'Excellent';
+    if (comfortScore < 40) level = 'Poor';
+    else if (comfortScore < 70) level = 'Fair';
+    else if (comfortScore < 90) level = 'Good';
+
+    // Default message if no specific issues were flagged
+    if (messages.length === 0) {
+      messages.push('Conditions are ideal for focus and learning.');
+    }
+
+    return {
+      comfort: { level, message: messages.join(' ') },
+      alert: alert,
+    };
+  };
+
+  // Get dynamic color based on comfort level
+  const getComfortColor = (level) => {
+    switch (level) {
+      case 'Excellent': return 'bg-green-600';
+      case 'Good': return 'bg-lime-500';
+      case 'Fair': return 'bg-orange-500';
+      case 'Poor': return 'bg-red-600 animate-pulse';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-700 text-gray-100 font-inter p-4 sm:p-8 rounded-lg shadow-xl">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <script src="https://cdn.tailwindcss.com"></script>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+      {/* Header Section */}
+      <header className="text-center mb-8">
+        <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-600 mb-2">
+          Smart Classroom Environment Analytics
+        </h1>
+        <p className="text-lg text-gray-300">Optimizing Learning Environments for Enhanced Productivity</p>
+      </header>
+
+      {/* Classroom Comfort & Focus Index */}
+      <section className={`p-6 rounded-lg shadow-xl mb-8 transition-all duration-500 ease-in-out ${getComfortColor(comfortIndex.level)}`}>
+        <h2 className="text-2xl sm:text-3xl font-bold mb-3 flex items-center justify-center">
+          {comfortIndex.level === 'Poor' && (
+            <span className="mr-3 text-white text-4xl animate-bounce">🚨</span>
+          )}
+          Classroom Comfort & Focus: <span className="ml-2">{comfortIndex.level.toUpperCase()}</span>
+        </h2>
+        <p className="text-xl text-center text-white font-medium">
+          {comfortIndex.message}
+        </p>
+        {alertMessage && (
+            <div className="mt-4 p-4 bg-gray-900 bg-opacity-70 rounded-md text-center text-white text-lg font-semibold border border-red-400">
+              <p>Action Recommended: {alertMessage}</p>
+            </div>
+          )}
+      </section>
+
+      {/* Environmental Sensor Data */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Temperature */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-indigo-700">
+          <h3 className="text-xl font-semibold mb-3 text-indigo-300 flex items-center">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 8h10M7 12h10m-9 4h6m-5 4a2 2 0 11-4 0 2 2 0 014 0zM12 21.882V21a2 2 0 00-2-2H8a2 2 0 00-2 2v.882A2 2 0 014 23h16a2 2 0 01-2-1.118z"></path></svg>
+            Temperature
+          </h3>
+          <p className="text-4xl font-bold text-indigo-400">{temperature}°C</p>
+          <p className="text-gray-400">Optimal: {TEMP_THRESHOLDS.OPTIMAL}°C (approx)</p>
+        </div>
+
+        {/* CO2 Levels */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-green-700">
+          <h3 className="text-xl font-semibold mb-3 text-green-300 flex items-center">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+            CO2 Levels
+          </h3>
+          <p className="text-4xl font-bold text-green-400">{co2} ppm</p>
+          <p className="text-gray-400">Optimal: &lt;{CO2_THRESHOLDS.GOOD} ppm</p>
+        </div>
+
+        {/* Ambient Lighting */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-yellow-700">
+          <h3 className="text-xl font-semibold mb-3 text-yellow-300 flex items-center">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 4a2 2 0 100 4m-3 13V16a2 2 0 01-2-2v-4a2 2 0 012-2h4a2 2 0 012 2v4a2 2 0 01-2 2v3m-3-6h6"></path></svg>
+            Ambient Lighting
+          </h3>
+          <p className="text-4xl font-bold text-yellow-400">{lux} Lux</p>
+          <p className="text-gray-400">Optimal: {LUX_THRESHOLDS.DIM}-{LUX_THRESHOLDS.BRIGHT} Lux</p>
+        </div>
+
+        {/* Noise Level */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-purple-700">
+          <h3 className="text-xl font-semibold mb-3 text-purple-300 flex items-center">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 11H5m14 0a2 2 0 012 2v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4a2 2 0 012-2m7 13V5a2 2 0 00-2-2H7a2 2 0 00-2 2v4"></path></svg>
+            Noise Level
+          </h3>
+          <p className="text-4xl font-bold text-purple-400">{noiseDb} dB</p>
+          <p className="text-gray-400">Optimal: &lt;{NOISE_THRESHOLDS.MODERATE} dB</p>
+        </div>
+      </section>
+
+      {/* System Information / Disclaimer */}
+      <section className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-gray-400 text-sm italic">
+        <h3 className="text-lg font-semibold mb-2 text-gray-200">System Information:</h3>
+        <p>
+          This dashboard provides a conceptual simulation of a Smart Classroom Environment & Productivity Analytics system.
+          In a complete system, real-time sensor data from microcontrollers (ESP32) would be ingested via Azure IoT Hub,
+          processed by Azure Stream Analytics, and analyzed by machine learning models in Azure Machine Learning to derive
+          insights into optimal learning conditions.
+        </p>
+        <p className="mt-2 text-xs">
+          <span className="font-bold">Disclaimer:</span> This is a simulated environment and should not be used for actual classroom management or critical decision-making.
+        </p>
+      </section>
+
+      {/* Footer Section */}
+      <footer className="text-center mt-8 text-gray-500 text-sm">
+        <p>&copy; {new Date().getFullYear()} Smart Classroom Analytics. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
