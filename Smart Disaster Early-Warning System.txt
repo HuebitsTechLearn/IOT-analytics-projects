@@ -1,0 +1,208 @@
+import React, { useState, useEffect } from 'react';
+
+// Main App component for the Smart Disaster Early-Warning System Dashboard
+function App() {
+  // State variables for simulated sensor data
+  const [seismicActivity, setSeismicActivity] = useState(0.5); // Richter scale equivalent
+  const [humidity, setHumidity] = useState(60); // Percentage
+  const [temperature, setTemperature] = useState(25); // Celsius
+  const [barometricPressure, setBarometricPressure] = useState(1012); // hPa
+  const [riskLevel, setRiskLevel] = useState({ level: 'Low', message: 'All systems normal.' });
+
+  // Simulate real-time data updates and risk assessment
+  useEffect(() => {
+    const dataInterval = setInterval(() => {
+      // Simulate slight fluctuations in sensor data
+      const newSeismic = parseFloat((Math.random() * 0.2 + 0.4).toFixed(2)); // 0.4 to 0.6
+      const newHumidity = Math.floor(Math.random() * 20) + 50; // 50 to 70
+      const newTemperature = Math.floor(Math.random() * 10) + 20; // 20 to 30
+      const newPressure = Math.floor(Math.random() * 20) + 1000; // 1000 to 1020
+
+      setSeismicActivity(newSeismic);
+      setHumidity(newHumidity);
+      setTemperature(newTemperature);
+      setBarometricPressure(newPressure);
+
+      // In a real application, this data would be sent to a backend
+      // for ML inference. Here, we simulate a simple risk calculation.
+      const currentRisk = calculateRisk(newSeismic, newHumidity, newTemperature, newPressure);
+      setRiskLevel(currentRisk);
+
+    }, 3000); // Update every 3 seconds
+
+    // Clear interval on component unmount
+    return () => clearInterval(dataInterval);
+  }, []); // Empty dependency array means this effect runs once on mount
+
+  /**
+   * Simulates the machine learning model's risk assessment.
+   * In a real system, this would be a complex ML model running on AWS SageMaker.
+   * @param {number} seismic - Current seismic activity.
+   * @param {number} humidity - Current humidity percentage.
+   * @param {number} temperature - Current temperature.
+   * @param {number} pressure - Current barometric pressure.
+   * @returns {{level: string, message: string}} The calculated risk level and message.
+   */
+  const calculateRisk = (seismic, humidity, temperature, pressure) => {
+    let level = 'Low';
+    let message = 'All systems normal. Monitoring environmental data.';
+
+    // Simple rules to simulate disaster conditions
+    // High seismic activity for earthquake
+    if (seismic >= 0.9) {
+      level = 'Critical';
+      message = 'HIGH SEISMIC ACTIVITY DETECTED! Potential Earthquake imminent. Seek immediate shelter.';
+    } else if (seismic >= 0.7) {
+      level = 'High';
+      message = 'Elevated Seismic Activity. Prepare for potential tremors.';
+    }
+
+    // High humidity + low pressure for floods/landslides
+    if (humidity >= 90 && pressure <= 990) {
+      if (level === 'Low' || level === 'Medium') { // Don't override earthquake warning
+        level = 'Critical';
+        message = 'FLOOD/LANDSLIDE RISK: Extreme humidity and low pressure detected! Evacuate low-lying areas.';
+      }
+    } else if (humidity >= 80 && pressure <= 1000) {
+      if (level === 'Low') {
+        level = 'High';
+        message = 'Significant Flood/Landslide Risk. Monitor local advisories.';
+      } else if (level === 'Medium') {
+        level = 'High';
+        message = 'Significant Flood/Landslide Risk. Monitor local advisories.';
+      }
+    }
+
+    // Combined conditions for elevated general risk
+    if ((seismic > 0.6 && humidity > 75) || (temperature > 35 && pressure < 1000)) {
+        if (level === 'Low') {
+            level = 'Medium';
+            message = 'Elevated environmental anomalies. Increased vigilance advised.';
+        }
+    }
+
+    return { level, message };
+  };
+
+  // Determine alert background color based on risk level
+  const getAlertColor = (level) => {
+    switch (level) {
+      case 'Low':
+        return 'bg-green-500';
+      case 'Medium':
+        return 'bg-yellow-500';
+      case 'High':
+        return 'bg-orange-500';
+      case 'Critical':
+        return 'bg-red-600 animate-pulse'; // Animate for critical alerts
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-700 text-gray-100 font-inter p-4 sm:p-8 rounded-lg shadow-xl">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <script src="https://cdn.tailwindcss.com"></script>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+      {/* Header Section */}
+      <header className="text-center mb-8">
+        <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 mb-2">
+          Smart Disaster Early-Warning System
+        </h1>
+        <p className="text-lg text-gray-300">Real-time Environmental Monitoring & Predictive Analytics</p>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="container mx-auto max-w-7xl">
+        {/* Current Risk and Alert Section */}
+        <section className={`p-6 rounded-lg shadow-xl mb-8 transition-all duration-500 ease-in-out ${getAlertColor(riskLevel.level)}`}>
+          <h2 className="text-2xl sm:text-3xl font-bold mb-3 flex items-center justify-center">
+            {/* Conditional icon based on risk level */}
+            {riskLevel.level === 'Critical' && (
+              <span className="mr-3 text-white text-4xl animate-bounce">🚨</span>
+            )}
+            {riskLevel.level === 'High' && (
+              <span className="mr-3 text-white text-3xl">⚠️</span>
+            )}
+            Current Risk Level: <span className="ml-2">{riskLevel.level.toUpperCase()}</span>
+          </h2>
+          <p className="text-xl text-center text-white font-medium">
+            {riskLevel.message}
+          </p>
+          {riskLevel.level === 'Critical' && (
+            <div className="mt-4 p-4 bg-red-800 bg-opacity-70 rounded-md text-center text-white text-lg font-semibold border border-red-400 animate-pulse-slow">
+              <p>IMMEDIATE EVACUATION PROTOCOL ACTIVATED!</p>
+              <p>Follow local emergency directives and move to designated safe zones.</p>
+            </div>
+          )}
+        </section>
+
+        {/* Sensor Data Display */}
+        <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {/* Sensor Card: Seismic Activity */}
+          <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 hover:border-blue-500 transition duration-300">
+            <h3 className="text-xl font-semibold mb-3 text-blue-300 flex items-center">
+              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+              Seismic Activity
+            </h3>
+            <p className="text-4xl font-bold text-blue-400">{seismicActivity.toFixed(2)}</p>
+            <p className="text-gray-400">Richter Scale Equivalent</p>
+          </div>
+
+          {/* Sensor Card: Humidity */}
+          <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 hover:border-green-500 transition duration-300">
+            <h3 className="text-xl font-semibold mb-3 text-green-300 flex items-center">
+              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 16v-4m0 0l4-4m-4 4l-4-4m-5-8h6a2 2 0 012 2v6a2 2 0 01-2 2H9a2 2 0 01-2-2V9a2 2 0 012-2z"></path></svg>
+              Humidity
+            </h3>
+            <p className="text-4xl font-bold text-green-400">{humidity}%</p>
+            <p className="text-gray-400">Relative Humidity</p>
+          </div>
+
+          {/* Sensor Card: Temperature */}
+          <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 hover:border-red-500 transition duration-300">
+            <h3 className="text-xl font-semibold mb-3 text-red-300 flex items-center">
+              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+              Temperature
+            </h3>
+            <p className="text-4xl font-bold text-red-400">{temperature}°C</p>
+            <p className="text-gray-400">Ambient Temperature</p>
+          </div>
+
+          {/* Sensor Card: Barometric Pressure */}
+          <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 hover:border-purple-500 transition duration-300">
+            <h3 className="text-xl font-semibold mb-3 text-purple-300 flex items-center">
+              <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+              Atmospheric Pressure
+            </h3>
+            <p className="text-4xl font-bold text-purple-400">{barometricPressure} hPa</p>
+            <p className="text-gray-400">Hectopascals</p>
+          </div>
+        </section>
+
+        {/* System Information / Disclaimer */}
+        <section className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-gray-400 text-sm italic">
+          <h3 className="text-lg font-semibold mb-2 text-gray-200">System Information:</h3>
+          <p>
+            This dashboard provides simulated real-time environmental data and a predictive risk assessment.
+            In a complete system, data would be fed from physical sensors via MQTT to AWS IoT Core,
+            processed, and analyzed by machine learning models on Amazon SageMaker.
+            Alerts would be disseminated via Amazon SNS (SMS) and displayed here.
+          </p>
+          <p className="mt-2 text-xs">
+            <span className="font-bold">Disclaimer:</span> This is a conceptual simulation and should not be used for actual disaster prediction.
+          </p>
+        </section>
+      </main>
+
+      {/* Footer Section */}
+      <footer className="text-center mt-8 text-gray-500 text-sm">
+        <p>&copy; {new Date().getFullYear()} Smart Disaster Early-Warning System. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
