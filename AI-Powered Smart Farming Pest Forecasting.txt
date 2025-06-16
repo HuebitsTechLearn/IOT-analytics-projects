@@ -1,0 +1,254 @@
+import React, { useState, useEffect } from 'react';
+
+// Main App component for the Smart Farming Pest Forecasting Dashboard
+function App() {
+  // State variables for simulated sensor data
+  const [temperature, setTemperature] = useState(25); // Celsius
+  const [humidity, setHumidity] = useState(60); // Percentage
+  const [soilpH, setSoilpH] = useState(6.5); // pH value
+
+  // State variables for simulated pest detection
+  const [pestDetected, setPestDetected] = useState(false);
+  const [pestCount, setPestCount] = useState(0);
+  const [pestType, setPestType] = useState('None');
+  const pestTypes = ['Aphids', 'Spider Mites', 'Whiteflies', 'Leaf Miners', 'None'];
+
+  // State variable for the overall pest outbreak risk
+  const [outbreakRisk, setOutbreakRisk] = useState({ level: 'Low', message: 'No significant pest activity detected. Crops appear healthy.' });
+
+  /**
+   * Simulates real-time sensor data and pest detection updates.
+   * In a real system, this would come from Raspberry Pi via a data pipeline.
+   */
+  useEffect(() => {
+    const dataInterval = setInterval(() => {
+      // Simulate slight fluctuations in sensor data
+      const newTemp = parseFloat((Math.random() * 5 + 22).toFixed(1)); // 22-27 C
+      const newHumidity = Math.floor(Math.random() * 20) + 50; // 50-70%
+      const newSoilpH = parseFloat((Math.random() * 0.4 + 6.3).toFixed(1)); // 6.3-6.7 pH
+
+      setTemperature(newTemp);
+      setHumidity(newHumidity);
+      setSoilpH(newSoilpH);
+
+      // Simulate pest detection logic (simplified)
+      const randomPestRoll = Math.random();
+      let currentPestDetected = false;
+      let currentPestCount = 0;
+      let currentPestType = 'None';
+
+      if (randomPestRoll < 0.1) { // 10% chance of high infestation
+        currentPestDetected = true;
+        currentPestCount = Math.floor(Math.random() * 15) + 10; // 10-25 pests
+        currentPestType = pestTypes[Math.floor(Math.random() * (pestTypes.length - 1))]; // Pick a random pest type
+      } else if (randomPestRoll < 0.3) { // 20% chance of low infestation
+        currentPestDetected = true;
+        currentPestCount = Math.floor(Math.random() * 5) + 1; // 1-5 pests
+        currentPestType = pestTypes[Math.floor(Math.random() * (pestTypes.length - 1))];
+      }
+
+      setPestDetected(currentPestDetected);
+      setPestCount(currentPestCount);
+      setPestType(currentPestType);
+
+      // Calculate and update outbreak risk
+      const currentRisk = calculateOutbreakRisk(newTemp, newHumidity, newSoilpH, currentPestDetected, currentPestCount, currentPestType);
+      setOutbreakRisk(currentRisk);
+
+    }, 4000); // Update every 4 seconds
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(dataInterval);
+  }, []); // Empty dependency array ensures this runs once on mount
+
+  /**
+   * Simulates the AI model's pest outbreak prediction.
+   * In a real system, this would be a more complex ML model trained on historical data.
+   * @param {number} temp - Current temperature.
+   * @param {number} humidity - Current humidity.
+   * @param {number} soilpH - Current soil pH.
+   * @param {boolean} detected - Whether pests were detected by camera.
+   * @param {number} count - Number of pests detected.
+   * @param {string} type - Type of pest detected.
+   * @returns {{level: string, message: string}} The calculated outbreak risk level and message.
+   */
+  const calculateOutbreakRisk = (temp, humidity, soilpH, detected, count, type) => {
+    let level = 'Low';
+    let message = 'No significant pest activity detected. Crops appear healthy.';
+
+    // Rule 1: High pest count from vision system
+    if (detected && count >= 10) {
+      level = 'High';
+      message = `IMMEDIATE ATTENTION REQUIRED: High count of ${type} (${count} detected). Rapid spread possible!`;
+    } else if (detected && count >= 1) {
+      level = 'Medium';
+      message = `Early detection: Small presence of ${type} (${count} detected). Monitor closely.`;
+    }
+
+    // Rule 2: Environmental conditions favorable for pests (even without high detection yet)
+    // Example: Warm, humid conditions favor many pests like aphids, spider mites
+    if (temp > 28 && humidity > 75) {
+      if (level === 'Low') { // Only upgrade if not already higher risk
+        level = 'Medium';
+        message = 'Environmental conditions are becoming favorable for pest proliferation. Increased vigilance advised.';
+      } else if (level === 'Medium' && !detected) { // If conditions are bad but no pests, elevate monitoring
+          message = 'Environmental conditions are highly favorable for pests. Active monitoring is critical.';
+      }
+    }
+
+    // Example: pH outside optimal range can stress plants, making them susceptible
+    if (soilpH < 5.5 || soilpH > 7.5) {
+        if (level === 'Low') {
+            level = 'Medium';
+            message = 'Soil pH is suboptimal, potentially stressing plants and increasing pest susceptibility.';
+        }
+    }
+
+    // Combine high pest count with bad conditions for critical alert
+    if (level === 'High' && temp > 28 && humidity > 75 && count >= 15) {
+        level = 'Critical';
+        message = `CRITICAL OUTBREAK ALERT: Large ${type} infestation (${count} detected) combined with highly favorable conditions. Immediate intervention needed!`;
+    }
+
+    return { level, message };
+  };
+
+  // Determine alert background color based on risk level
+  const getRiskColor = (level) => {
+    switch (level) {
+      case 'Low':
+        return 'bg-green-600';
+      case 'Medium':
+        return 'bg-yellow-600';
+      case 'High':
+        return 'bg-orange-600';
+      case 'Critical':
+        return 'bg-red-700 animate-pulse';
+      default:
+        return 'bg-gray-500';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 to-gray-700 text-gray-100 font-inter p-4 sm:p-8 rounded-lg shadow-xl">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <script src="https://cdn.tailwindcss.com"></script>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+      {/* Header Section */}
+      <header className="text-center mb-8">
+        <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-lime-400 to-emerald-600 mb-2">
+          AI-Powered Smart Farming Pest Forecasting
+        </h1>
+        <p className="text-lg text-gray-300">Proactive Pest Management for Sustainable Agriculture</p>
+      </header>
+
+      {/* Current Risk and Alert Section */}
+      <section className={`p-6 rounded-lg shadow-xl mb-8 transition-all duration-500 ease-in-out ${getRiskColor(outbreakRisk.level)}`}>
+        <h2 className="text-2xl sm:text-3xl font-bold mb-3 flex items-center justify-center">
+          {outbreakRisk.level === 'Critical' && (
+            <span className="mr-3 text-white text-4xl animate-bounce">🚨</span>
+          )}
+          {outbreakRisk.level === 'High' && (
+            <span className="mr-3 text-white text-3xl">⚠️</span>
+          )}
+          Pest Outbreak Risk: <span className="ml-2">{outbreakRisk.level.toUpperCase()}</span>
+        </h2>
+        <p className="text-xl text-center text-white font-medium">
+          {outbreakRisk.message}
+        </p>
+        {outbreakRisk.level === 'Critical' && (
+            <div className="mt-4 p-4 bg-red-900 bg-opacity-70 rounded-md text-center text-white text-lg font-semibold border border-red-400 animate-pulse-slow">
+              <p>IMMEDIATE ACTION RECOMMENDED!</p>
+              <p>Consider targeted pesticide application or biological control measures.</p>
+            </div>
+          )}
+      </section>
+
+      {/* Sensor Data & Camera Feed Section */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Environmental Sensor Data */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 hover:border-lime-500 transition duration-300">
+          <h3 className="text-xl font-semibold mb-4 text-lime-300 flex items-center">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            Environmental Conditions
+          </h3>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center text-lg">
+              <span className="text-gray-400">Temperature:</span>
+              <span className="font-bold text-lime-400">{temperature}°C</span>
+            </div>
+            <div className="flex justify-between items-center text-lg">
+              <span className="text-gray-400">Humidity:</span>
+              <span className="font-bold text-lime-400">{humidity}%</span>
+            </div>
+            <div className="flex justify-between items-center text-lg">
+              <span className="text-gray-400">Soil pH:</span>
+              <span className="font-bold text-lime-400">{soilpH}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Simulated Camera Feed & Pest Detection */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 hover:border-emerald-500 transition duration-300">
+          <h3 className="text-xl font-semibold mb-4 text-emerald-300 flex items-center">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            Camera Feed & Pest Detection
+          </h3>
+          <div className="relative w-full h-48 bg-gray-700 rounded-md overflow-hidden mb-4 flex items-center justify-center">
+            <img
+              src={pestDetected ? "https://placehold.co/400x200/4CAF50/FFFFFF?text=Pests+Detected!" : "https://placehold.co/400x200/607D8B/FFFFFF?text=Monitoring+Crops..."}
+              alt="Simulated Crop View"
+              className="w-full h-full object-cover"
+              onError={(e) => { e.target.onerror = null; e.target.src="https://placehold.co/400x200/607D8B/FFFFFF?text=Image+Load+Error"; }}
+            />
+            {pestDetected && (
+                <div className="absolute top-2 left-2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-semibold animate-pulse">
+                    PEST ALERT!
+                </div>
+            )}
+          </div>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center text-lg">
+              <span className="text-gray-400">Pest Detected:</span>
+              <span className="font-bold text-emerald-400">{pestDetected ? 'Yes' : 'No'}</span>
+            </div>
+            {pestDetected && (
+              <>
+                <div className="flex justify-between items-center text-lg">
+                  <span className="text-gray-400">Pest Type:</span>
+                  <span className="font-bold text-emerald-400">{pestType}</span>
+                </div>
+                <div className="flex justify-between items-center text-lg">
+                  <span className="text-gray-400">Count:</span>
+                  <span className="font-bold text-emerald-400">{pestCount}</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* System Information / Disclaimer */}
+      <section className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-gray-400 text-sm italic">
+        <h3 className="text-lg font-semibold mb-2 text-gray-200">System Information:</h3>
+        <p>
+          This dashboard provides a simulated view of an AI-Powered Smart Farming Pest Forecasting system.
+          In a complete system, sensor data and camera images would be collected by a Raspberry Pi
+          running OpenCV for on-edge pest detection. This data, combined with historical trends,
+          would feed into a Python-based ML model (Scikit-learn) to predict pest outbreaks.
+        </p>
+        <p className="mt-2 text-xs">
+          <span className="font-bold">Disclaimer:</span> This is a conceptual simulation and should not be used for actual agricultural decision-making.
+        </p>
+      </section>
+
+      {/* Footer Section */}
+      <footer className="text-center mt-8 text-gray-500 text-sm">
+        <p>&copy; {new Date().getFullYear()} AI-Powered Smart Farming. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
