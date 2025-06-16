@@ -1,0 +1,237 @@
+import React, { useState, useEffect } from 'react';
+
+// Define thresholds and categories for grid parameters
+const LOAD_THRESHOLDS = {
+  LOW: 500, // MW
+  NORMAL: 1500,
+  HIGH: 2500,
+  CRITICAL: 3500,
+};
+
+const VOLTAGE_THRESHOLDS = {
+  NORMAL_MIN: 220, // kV
+  NORMAL_MAX: 240,
+  ANOMALY_LOW: 210,
+  ANOMALY_HIGH: 250,
+};
+
+const VIBRATION_THRESHOLDS = {
+  NORMAL: 0.5, // G-force equivalent
+  HIGH: 1.0,
+  CRITICAL: 1.5,
+};
+
+// Main App component for the Smart Grid Dashboard
+function App() {
+  // State variables for simulated grid data
+  const [currentLoad, setCurrentLoad] = useState(1800); // MW
+  const [loadForecast, setLoadForecast] = useState(2000); // MW (e.g., for next hour)
+  const [voltage, setVoltage] = useState(230); // kV
+  const [lineVibration, setLineVibration] = useState(0.4); // G
+  const [outagePrediction, setOutagePrediction] = useState(null); // Message for potential outage
+  const [gridHealthStatus, setGridHealthStatus] = useState('Stable'); // Stable, Warning, Critical
+
+  /**
+   * Simulates real-time grid data updates and predictive insights.
+   * In a real system, this data would be streamed from smart meters, sensors,
+   * processed by Azure Stream Analytics, and analyzed by LSTM models.
+   */
+  useEffect(() => {
+    const dataInterval = setInterval(() => {
+      // Simulate current load fluctuation based on a simplified daily pattern
+      const now = new Date();
+      const hour = now.getHours();
+      let baseLoad = 1000; // Base load at night
+      if (hour >= 6 && hour < 10) baseLoad = 2500; // Morning peak
+      else if (hour >= 10 && hour < 17) baseLoad = 1800; // Day
+      else if (hour >= 17 && hour < 22) baseLoad = 3000; // Evening peak
+
+      const newLoad = Math.floor(baseLoad + (Math.random() * 500 - 250)); // +/- 250 MW
+      setCurrentLoad(Math.max(0, newLoad));
+
+      // Simulate next hour's load forecast (simplified from current trend)
+      const nextHourLoadForecast = Math.floor(newLoad + (Math.random() * 300 - 150)); // +/- 150 MW from current
+      setLoadForecast(Math.max(0, nextHourLoadForecast));
+
+      // Simulate voltage fluctuations and anomalies
+      const newVoltage = parseFloat((voltage + (Math.random() * 4 - 2)).toFixed(1)); // +/- 2 kV
+      setVoltage(Math.max(200, Math.min(260, newVoltage)));
+
+      // Simulate line vibration fluctuations and potential issues
+      const newVibration = parseFloat((lineVibration + (Math.random() * 0.2 - 0.1)).toFixed(1)); // +/- 0.1 G
+      setLineVibration(Math.max(0.1, Math.min(2.0, newVibration)));
+
+      // Calculate grid health and outage prediction based on simulated data
+      const health = calculateGridHealth(newLoad, newVoltage, newVibration);
+      setGridHealthStatus(health.status);
+      setOutagePrediction(health.outageAlert);
+
+    }, 3000); // Update every 3 seconds
+
+    // Clear interval on component unmount
+    return () => clearInterval(dataInterval);
+  }, [currentLoad, voltage, lineVibration]); // Dependencies to re-evaluate health/forecast
+
+  /**
+   * Simulates the LSTM model's analysis for grid health and outage prediction.
+   * In a real system, this would be a complex LSTM model on Azure ML.
+   * @param {number} load - Current electricity load (MW).
+   * @param {number} voltage - Current voltage (kV).
+   * @param {number} vibration - Line vibration (G).
+   * @returns {{status: string, outageAlert: string|null}}
+   */
+  const calculateGridHealth = (load, voltageVal, vibrationVal) => {
+    let status = 'Stable';
+    let outageAlert = null;
+    let issues = [];
+
+    // Evaluate Load
+    if (load > LOAD_THRESHOLDS.CRITICAL) {
+      status = 'Critical';
+      issues.push('CRITICAL LOAD: System near capacity. Risk of overload!');
+      outageAlert = 'High Load Alert: Potential localized blackout in next hour.';
+    } else if (load > LOAD_THRESHOLDS.HIGH) {
+      if (status === 'Stable') status = 'Warning'; // Upgrade status if not already critical
+      issues.push('HIGH LOAD: Elevated demand. Monitor closely.');
+    }
+
+    // Evaluate Voltage
+    if (voltageVal < VOLTAGE_THRESHOLDS.ANOMALY_LOW || voltageVal > VOLTAGE_THRESHOLDS.ANOMALY_HIGH) {
+      status = 'Critical';
+      issues.push('VOLTAGE ANOMALY: Unstable voltage detected. Risk of equipment damage/outage.');
+      outageAlert = outageAlert || 'Voltage Anomaly: Immediate attention required!';
+    } else if (voltageVal < VOLTAGE_THRESHOLDS.NORMAL_MIN || voltageVal > VOLTAGE_THRESHOLDS.NORMAL_MAX) {
+      if (status === 'Stable') status = 'Warning';
+      issues.push('Voltage deviation from normal range. Investigate.');
+    }
+
+    // Evaluate Line Vibration
+    if (vibrationVal > VIBRATION_THRESHOLDS.CRITICAL) {
+      status = 'Critical';
+      issues.push('CRITICAL VIBRATION: Severe line oscillation. High risk of line fault/collapse!');
+      outageAlert = outageAlert || 'Line Integrity Alert: High risk of outage on affected line!';
+    } else if (vibrationVal > VIBRATION_THRESHOLDS.HIGH) {
+      if (status === 'Stable') status = 'Warning';
+      issues.push('HIGH VIBRATION: Potential structural issue on power lines.');
+    }
+
+    // Combine issues for a more comprehensive alert
+    if (issues.length > 0 && !outageAlert) {
+        outageAlert = "Multiple anomalies detected. System requires attention.";
+    } else if (issues.length === 0) {
+        outageAlert = null;
+    }
+
+    return { status, outageAlert };
+  };
+
+  // Get dynamic background color for overall grid health
+  const getHealthColor = (status) => {
+    switch (status) {
+      case 'Stable': return 'bg-green-600';
+      case 'Warning': return 'bg-orange-500';
+      case 'Critical': return 'bg-red-600 animate-pulse';
+      default: return 'bg-gray-500';
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-700 text-gray-100 font-inter p-4 sm:p-8 rounded-lg shadow-xl">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <script src="https://cdn.tailwindcss.com"></script>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+      {/* Header Section */}
+      <header className="text-center mb-8">
+        <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-blue-600 mb-2">
+          Smart Grid Load Forecasting & Outage Prediction
+        </h1>
+        <p className="text-lg text-gray-300">Enhancing Grid Reliability and Efficiency</p>
+      </header>
+
+      {/* Overall Grid Health & Outage Alert */}
+      <section className={`p-6 rounded-lg shadow-xl mb-8 transition-all duration-500 ease-in-out ${getHealthColor(gridHealthStatus)}`}>
+        <h2 className="text-2xl sm:text-3xl font-bold mb-3 flex items-center justify-center">
+          {gridHealthStatus === 'Critical' && (
+            <span className="mr-3 text-white text-4xl animate-bounce">🚨</span>
+          )}
+          Grid Health Status: <span className="ml-2">{gridHealthStatus.toUpperCase()}</span>
+        </h2>
+        <p className="text-xl text-center text-white font-medium">
+          {gridHealthStatus === 'Stable' && 'Grid operating within normal parameters. All good.'}
+          {gridHealthStatus === 'Warning' && 'Minor anomalies detected. Increased monitoring advised.'}
+          {gridHealthStatus === 'Critical' && 'CRITICAL CONDITIONS: Immediate attention required!'}
+        </p>
+        {outagePrediction && (
+            <div className="mt-4 p-4 bg-gray-900 bg-opacity-70 rounded-md text-center text-white text-lg font-semibold border border-red-400">
+              <p>Outage Prediction: {outagePrediction}</p>
+            </div>
+          )}
+      </section>
+
+      {/* Key Metrics Dashboard */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        {/* Current Load */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-teal-700">
+          <h3 className="text-xl font-semibold mb-3 text-teal-300 flex items-center">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            Current Load
+          </h3>
+          <p className="text-4xl font-bold text-teal-400">{currentLoad} MW</p>
+          <p className="text-gray-400">Real-time Demand</p>
+        </div>
+
+        {/* Load Forecast */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-blue-700">
+          <h3 className="text-xl font-semibold mb-3 text-blue-300 flex items-center">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+            Load Forecast
+          </h3>
+          <p className="text-4xl font-bold text-blue-400">{loadForecast} MW</p>
+          <p className="text-gray-400">Next Hour Projection</p>
+        </div>
+
+        {/* Voltage Levels */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-purple-700">
+          <h3 className="text-xl font-semibold mb-3 text-purple-300 flex items-center">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+            Voltage
+          </h3>
+          <p className="text-4xl font-bold text-purple-400">{voltage} kV</p>
+          <p className="text-gray-400">Grid Stability</p>
+        </div>
+
+        {/* Line Vibration */}
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-orange-700">
+          <h3 className="text-xl font-semibold mb-3 text-orange-300 flex items-center">
+            <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+            Line Vibration
+          </h3>
+          <p className="text-4xl font-bold text-orange-400">{lineVibration} G</p>
+          <p className="text-gray-400">Structural Health</p>
+        </div>
+      </section>
+
+      {/* System Information / Disclaimer */}
+      <section className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-gray-400 text-sm italic">
+        <h3 className="text-lg font-semibold mb-2 text-gray-200">System Information:</h3>
+        <p>
+          This dashboard provides a conceptual simulation of a Smart Grid Load Forecasting & Outage Prediction system.
+          In a complete system, real-time data from smart meters, line vibration, and voltage sensors would be
+          ingested via Azure IoT Hub, processed by Azure Stream Analytics, analyzed by LSTM models in Azure Machine Learning,
+          and visualized through Azure Time Series Insights and custom dashboards.
+        </p>
+        <p className="mt-2 text-xs">
+          <span className="font-bold">Disclaimer:</span> This is a simulated environment and should not be used for actual grid operations or critical infrastructure management.
+        </p>
+      </section>
+
+      {/* Footer Section */}
+      <footer className="text-center mt-8 text-gray-500 text-sm">
+        <p>&copy; {new Date().getFullYear()} Smart Grid Solutions. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
