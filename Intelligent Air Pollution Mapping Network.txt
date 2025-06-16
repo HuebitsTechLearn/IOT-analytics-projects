@@ -1,0 +1,217 @@
+import React, { useState, useEffect } from 'react';
+
+// Define the structure for a sensor node
+const NUM_ROWS = 5;
+const NUM_COLS = 6;
+const INITIAL_NODES = Array.from({ length: NUM_ROWS * NUM_COLS }).map((_, index) => ({
+  id: index,
+  row: Math.floor(index / NUM_COLS),
+  col: index % NUM_COLS,
+  pm2_5: 0,
+  pm10: 0,
+  co2: 0,
+  nox: 0,
+  aqi: 0,
+}));
+
+// Main App component for the Intelligent Air Pollution Mapping Network Dashboard
+function App() {
+  const [sensorNodes, setSensorNodes] = useState(INITIAL_NODES);
+  const [overallAQI, setOverallAQI] = useState({ level: 'Good', message: 'Air quality is excellent.' });
+
+  // Function to generate simulated pollution data for a single node
+  const generateRandomPollutionData = () => {
+    // These ranges are simplified for simulation and represent varying levels
+    const pm2_5 = parseFloat((Math.random() * 40 + 5).toFixed(1));  // 5 to 45 (µg/m³)
+    const pm10 = parseFloat((Math.random() * 60 + 10).toFixed(1)); // 10 to 70 (µg/m³)
+    const co2 = Math.floor(Math.random() * 600 + 400); // 400 to 1000 (ppm)
+    const nox = parseFloat((Math.random() * 0.08 + 0.02).toFixed(2)); // 0.02 to 0.10 (ppm)
+    return { pm2_5, pm10, co2, nox };
+  };
+
+  /**
+   * Calculates a simplified Air Quality Index (AQI) for a single node.
+   * This is a highly simplified model for demonstration. Real AQI involves
+   * complex calculations and breakpoints for multiple pollutants.
+   * For this simulation:
+   * 0-50: Good (Green)
+   * 51-100: Moderate (Yellow)
+   * 101-150: Unhealthy for Sensitive Groups (Orange)
+   * 151-200: Unhealthy (Red)
+   * >200: Very Unhealthy/Hazardous (Purple/Maroon)
+   */
+  const calculateNodeAQI = (data) => {
+    const { pm2_5, pm10, co2, nox } = data;
+
+    // Assign points based on pollutant levels (simplified scoring)
+    let aqiPoints = 0;
+    if (pm2_5 > 35) aqiPoints += (pm2_5 - 35) * 2; // Unhealthy if > 35
+    if (pm10 > 50) aqiPoints += (pm10 - 50) * 1.5; // Unhealthy if > 50
+    if (co2 > 800) aqiPoints += (co2 - 800) / 5;   // Elevated if > 800
+    if (nox > 0.06) aqiPoints += (nox - 0.06) * 500; // Elevated if > 0.06
+
+    return Math.min(Math.floor(aqiPoints + pm2_5 / 0.5 + pm10 / 0.8), 300); // Cap AQI for display
+  };
+
+  /**
+   * Determines the Tailwind CSS color class based on AQI value.
+   */
+  const getPollutionColor = (aqi) => {
+    if (aqi <= 50) return 'bg-green-500'; // Good
+    if (aqi <= 100) return 'bg-yellow-500'; // Moderate
+    if (aqi <= 150) return 'bg-orange-500'; // Unhealthy for Sensitive Groups
+    if (aqi <= 200) return 'bg-red-600'; // Unhealthy
+    if (aqi <= 300) return 'bg-purple-700'; // Very Unhealthy
+    return 'bg-gray-800'; // Hazardous (or default if out of range)
+  };
+
+  /**
+   * Calculates the overall AQI for the city and a corresponding message.
+   */
+  const calculateOverallAQI = (nodes) => {
+    if (nodes.length === 0) return { level: 'N/A', message: 'No sensor data available.' };
+
+    const totalAQI = nodes.reduce((sum, node) => sum + node.aqi, 0);
+    const averageAQI = totalAQI / nodes.length;
+
+    let level = 'Good';
+    let message = 'Air quality is generally good across the city.';
+
+    if (averageAQI > 200) {
+      level = 'Hazardous';
+      message = 'HAZARDOUS AIR QUALITY! Avoid outdoor activities and stay indoors. Very unhealthy for all.';
+    } else if (averageAQI > 150) {
+      level = 'Unhealthy';
+      message = 'UNHEALTHY AIR QUALITY. Sensitive groups should avoid outdoor activities. All may experience symptoms.';
+    } else if (averageAQI > 100) {
+      level = 'Unhealthy for Sensitive Groups';
+      message = 'Air quality is unhealthy for sensitive groups. Reduce prolonged outdoor exertion.';
+    } else if (averageAQI > 50) {
+      level = 'Moderate';
+      message = 'Air quality is acceptable. However, some pollutants may pose a moderate health concern for a very small number of people.';
+    }
+
+    return { level, message, average: averageAQI.toFixed(0) };
+  };
+
+  // Effect to simulate real-time data updates
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setSensorNodes(prevNodes => {
+        const updatedNodes = prevNodes.map(node => {
+          const newPollutionData = generateRandomPollutionData();
+          const newAQI = calculateNodeAQI(newPollutionData);
+          return { ...node, ...newPollutionData, aqi: newAQI };
+        });
+        setOverallAQI(calculateOverallAQI(updatedNodes));
+        return updatedNodes;
+      });
+    }, 5000); // Update every 5 seconds
+
+    // Initial data generation on component mount
+    setSensorNodes(prevNodes => {
+      const initialUpdatedNodes = prevNodes.map(node => {
+        const newPollutionData = generateRandomPollutionData();
+        const newAQI = calculateNodeAQI(newPollutionData);
+        return { ...node, ...newPollutionData, aqi: newAQI };
+      });
+      setOverallAQI(calculateOverallAQI(initialUpdatedNodes));
+      return initialUpdatedNodes;
+    });
+
+
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-gray-100 font-inter p-4 sm:p-8 rounded-lg shadow-xl">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <script src="https://cdn.tailwindcss.com"></script>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+      {/* Header Section */}
+      <header className="text-center mb-8">
+        <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-teal-400 to-cyan-600 mb-2">
+          Intelligent Air Pollution Mapping Network
+        </h1>
+        <p className="text-lg text-gray-300">Real-time Urban Air Quality Monitoring & Analytics</p>
+      </header>
+
+      {/* Overall AQI & Status */}
+      <section className={`p-6 rounded-lg shadow-xl mb-8 transition-all duration-500 ease-in-out
+        ${overallAQI.level === 'Good' ? 'bg-green-600' :
+          overallAQI.level === 'Moderate' ? 'bg-yellow-600' :
+          overallAQI.level === 'Unhealthy for Sensitive Groups' ? 'bg-orange-600' :
+          overallAQI.level === 'Unhealthy' ? 'bg-red-700' :
+          overallAQI.level === 'Hazardous' ? 'bg-purple-800 animate-pulse' : 'bg-gray-700'}`}>
+        <h2 className="text-2xl sm:text-3xl font-bold mb-3 flex items-center justify-center">
+          {overallAQI.level === 'Hazardous' && <span className="mr-3 text-white text-4xl animate-bounce">🚨</span>}
+          {overallAQI.level === 'Unhealthy' && <span className="mr-3 text-white text-3xl">⚠️</span>}
+          Overall City AQI: {overallAQI.average || 'N/A'} - {overallAQI.level.toUpperCase()}
+        </h2>
+        <p className="text-xl text-center text-white font-medium">
+          {overallAQI.message}
+        </p>
+      </section>
+
+      {/* City Grid Heatmap */}
+      <section className="mb-8 p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+        <h2 className="text-2xl font-bold text-gray-200 mb-4 text-center">Live Pollution Heatmap</h2>
+        <div
+          className="grid gap-2 mx-auto"
+          style={{
+            gridTemplateColumns: `repeat(${NUM_COLS}, minmax(0, 1fr))`,
+            width: 'fit-content'
+          }}
+        >
+          {sensorNodes.map(node => (
+            <div
+              key={node.id}
+              className={`w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center text-xs sm:text-sm
+                text-white font-semibold rounded-lg shadow-md transition-colors duration-500
+                ${getPollutionColor(node.aqi)}`}
+              title={`Node ${node.id} (R${node.row}, C${node.col})\nPM2.5: ${node.pm2_5} µg/m³\nPM10: ${node.pm10} µg/m³\nCO2: ${node.co2} ppm\nNOx: ${node.nox} ppm\nAQI: ${node.aqi}`}
+            >
+              {node.aqi}
+            </div>
+          ))}
+        </div>
+        <p className="text-center text-gray-400 text-sm mt-4">Hover over cells for detailed pollutant data.</p>
+      </section>
+
+      {/* AQI Legend */}
+      <section className="mb-8 p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+        <h2 className="text-2xl font-bold text-gray-200 mb-4 text-center">AQI Categories</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 text-sm text-center">
+          <div className="p-3 rounded-md bg-green-500 text-white font-semibold">Good (0-50)</div>
+          <div className="p-3 rounded-md bg-yellow-500 text-gray-900 font-semibold">Moderate (51-100)</div>
+          <div className="p-3 rounded-md bg-orange-500 text-white font-semibold">Unhealthy for Sensitive Groups (101-150)</div>
+          <div className="p-3 rounded-md bg-red-600 text-white font-semibold">Unhealthy (151-200)</div>
+          <div className="p-3 rounded-md bg-purple-700 text-white font-semibold">Very Unhealthy (201-300)</div>
+          <div className="p-3 rounded-md bg-gray-800 text-white font-semibold border border-gray-600">Hazardous (>300)</div>
+        </div>
+      </section>
+
+      {/* System Information / Disclaimer */}
+      <section className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-gray-400 text-sm italic">
+        <h3 className="text-lg font-semibold mb-2 text-gray-200">System Information:</h3>
+        <p>
+          This dashboard provides a conceptual simulation of a real-time air quality monitoring network.
+          In a complete system, data from edge-deployed sensors (PM2.5, PM10, CO2, NOx) would be transmitted
+          via MQTT to Google Cloud IoT Core, processed by cloud functions, stored in BigQuery, and then
+          used to power this live visualization and predictive analytics.
+        </p>
+        <p className="mt-2 text-xs">
+          <span className="font-bold">Disclaimer:</span> This is a simulated environment and does not reflect actual air quality data.
+        </p>
+      </section>
+
+      {/* Footer Section */}
+      <footer className="text-center mt-8 text-gray-500 text-sm">
+        <p>&copy; {new Date().getFullYear()} Intelligent Air Pollution Mapping Network. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
