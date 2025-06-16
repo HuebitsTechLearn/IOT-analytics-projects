@@ -1,0 +1,198 @@
+import React, { useState, useEffect } from 'react';
+
+// Define bed statuses and their corresponding colors
+const BED_STATUSES = {
+  EMPTY: 'empty',
+  OCCUPIED: 'occupied',
+  CLEANING: 'cleaning',
+};
+
+const BED_COLORS = {
+  [BED_STATUSES.EMPTY]: 'bg-green-500',
+  [BED_STATUSES.OCCUPIED]: 'bg-red-500',
+  [BED_STATUSES.CLEANING]: 'bg-yellow-500',
+};
+
+// Simulate a hospital ward layout (rows x columns of beds)
+const NUM_ROWS = 5;
+const NUM_COLS = 10;
+const TOTAL_BEDS = NUM_ROWS * NUM_COLS;
+
+// Initial state for all beds (start mostly empty with some occupied)
+const initialBeds = Array.from({ length: TOTAL_BEDS }).map((_, index) => ({
+  id: `bed-${index + 1}`,
+  status: Math.random() < 0.3 ? BED_STATUSES.OCCUPIED : BED_STATUSES.EMPTY, // 30% initially occupied
+  ward: `Ward ${Math.floor(index / 20) + 1}`, // Simulate wards
+}));
+
+// Main App component for the Hospital Bed Occupancy Dashboard
+function App() {
+  const [beds, setBeds] = useState(initialBeds);
+  const [occupancyPercentage, setOccupancyPercentage] = useState(0);
+  const [emptyBeds, setEmptyBeds] = useState(0);
+  const [occupiedBeds, setOccupiedBeds] = useState(0);
+  const [cleaningBeds, setCleaningBeds] = useState(0);
+  const [peakLoadForecast, setPeakLoadForecast] = useState(''); // Simulated forecast message
+
+  /**
+   * Calculates current bed occupancy statistics.
+   */
+  const updateBedStats = (currentBeds) => {
+    const occupied = currentBeds.filter(bed => bed.status === BED_STATUSES.OCCUPIED).length;
+    const empty = currentBeds.filter(bed => bed.status === BED_STATUSES.EMPTY).length;
+    const cleaning = currentBeds.filter(bed => bed.status === BED_STATUSES.CLEANING).length;
+    const percentage = (occupied / TOTAL_BEDS) * 100;
+
+    setOccupancyPercentage(percentage.toFixed(1));
+    setOccupiedBeds(occupied);
+    setEmptyBeds(empty);
+    setCleaningBeds(cleaning);
+
+    // Simulate simple peak load forecast based on current occupancy
+    if (percentage > 90) {
+      setPeakLoadForecast('CRITICAL: High occupancy detected. Expect peak patient load soon!');
+    } else if (percentage > 75) {
+      setPeakLoadForecast('HIGH: Occupancy is rising. Prepare for increased patient flow.');
+    } else if (percentage > 50) {
+      setPeakLoadForecast('MEDIUM: Moderate occupancy. Monitor trends.');
+    } else {
+      setPeakLoadForecast('LOW: Current occupancy is manageable.');
+    }
+  };
+
+  /**
+   * Simulates real-time bed status changes (admissions, discharges, cleaning).
+   * In a real system, these would be driven by actual sensor data.
+   */
+  useEffect(() => {
+    // Initial update of stats
+    updateBedStats(beds);
+
+    const interval = setInterval(() => {
+      setBeds(prevBeds => {
+        const newBeds = [...prevBeds];
+        const randomIndex = Math.floor(Math.random() * TOTAL_BEDS);
+        const currentBed = newBeds[randomIndex];
+
+        // Simulate state transitions
+        if (currentBed.status === BED_STATUSES.OCCUPIED) {
+          // Patient discharged, bed goes to cleaning
+          if (Math.random() < 0.2) { // 20% chance of discharge
+            newBeds[randomIndex] = { ...currentBed, status: BED_STATUSES.CLEANING };
+          }
+        } else if (currentBed.status === BED_STATUSES.CLEANING) {
+          // Cleaning finished, bed becomes empty
+          if (Math.random() < 0.5) { // 50% chance cleaning finishes
+            newBeds[randomIndex] = { ...currentBed, status: BED_STATUSES.EMPTY };
+          }
+        } else if (currentBed.status === BED_STATUSES.EMPTY) {
+          // New patient admission
+          if (Math.random() < 0.1) { // 10% chance of admission
+            newBeds[randomIndex] = { ...currentBed, status: BED_STATUSES.OCCUPIED };
+          }
+        }
+        updateBedStats(newBeds); // Update stats after bed changes
+        return newBeds;
+      });
+    }, 2000); // Update every 2 seconds
+
+    // Cleanup interval on component unmount
+    return () => clearInterval(interval);
+  }, []); // Empty dependency array means this effect runs once on mount
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-indigo-700 text-gray-100 font-inter p-4 sm:p-8 rounded-lg shadow-xl">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <script src="https://cdn.tailwindcss.com"></script>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+      {/* Header Section */}
+      <header className="text-center mb-8">
+        <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 mb-2">
+          IoT-Driven Hospital Bed Occupancy Analytics
+        </h1>
+        <p className="text-lg text-gray-300">Real-time Bed Utilization & Patient Flow Optimization</p>
+      </header>
+
+      {/* Overview Statistics */}
+      <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-blue-700">
+          <h3 className="text-xl font-semibold mb-2 text-blue-300">Total Beds</h3>
+          <p className="text-4xl font-bold text-blue-400">{TOTAL_BEDS}</p>
+        </div>
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-red-700">
+          <h3 className="text-xl font-semibold mb-2 text-red-300">Occupied Beds</h3>
+          <p className="text-4xl font-bold text-red-400">{occupiedBeds}</p>
+        </div>
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-green-700">
+          <h3 className="text-xl font-semibold mb-2 text-green-300">Empty Beds</h3>
+          <p className="text-4xl font-bold text-green-400">{emptyBeds}</p>
+        </div>
+        <div className="bg-gray-800 p-6 rounded-lg shadow-lg border border-yellow-700">
+          <h3 className="text-xl font-semibold mb-2 text-yellow-300">Cleaning Beds</h3>
+          <p className="text-4xl font-bold text-yellow-400">{cleaningBeds}</p>
+        </div>
+      </section>
+
+      {/* Occupancy Percentage & Forecast */}
+      <section className="p-6 rounded-lg shadow-xl mb-8 bg-gray-800 border border-indigo-700">
+        <h2 className="text-2xl sm:text-3xl font-bold mb-3 text-center text-indigo-300">
+          Overall Occupancy: <span className="text-indigo-400">{occupancyPercentage}%</span>
+        </h2>
+        <p className="text-xl text-center text-gray-200">
+          <span className="font-semibold text-purple-400">Forecast:</span> {peakLoadForecast}
+        </p>
+      </section>
+
+      {/* Bed Grid Visualization */}
+      <section className="mb-8 p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+        <h2 className="text-2xl font-bold text-gray-200 mb-4 text-center">Live Bed Status Map</h2>
+        <div className="grid gap-2 mx-auto" style={{ gridTemplateColumns: `repeat(${NUM_COLS}, minmax(0, 1fr))` }}>
+          {beds.map(bed => (
+            <div
+              key={bed.id}
+              className={`w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center text-xs sm:text-sm
+                text-white font-semibold rounded-md shadow-sm transition-colors duration-300
+                ${BED_COLORS[bed.status]}`}
+              title={`${bed.id} - ${bed.ward} - ${bed.status.toUpperCase()}`}
+            >
+              {bed.id.split('-')[1]} {/* Display bed number */}
+            </div>
+          ))}
+        </div>
+        <p className="text-center text-gray-400 text-sm mt-4">Hover over beds for ID and Ward info.</p>
+      </section>
+
+      {/* Legend */}
+      <section className="mb-8 p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+        <h2 className="text-2xl font-bold text-gray-200 mb-4 text-center">Bed Status Legend</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm text-center">
+          <div className="p-3 rounded-md bg-green-500 text-white font-semibold">Empty</div>
+          <div className="p-3 rounded-md bg-red-500 text-white font-semibold">Occupied</div>
+          <div className="p-3 rounded-md bg-yellow-500 text-gray-900 font-semibold">Cleaning</div>
+        </div>
+      </section>
+
+      {/* System Information / Disclaimer */}
+      <section className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-gray-400 text-sm italic">
+        <h3 className="text-lg font-semibold mb-2 text-gray-200">System Information:</h3>
+        <p>
+          This dashboard provides a conceptual simulation of real-time hospital bed occupancy.
+          In a complete system, actual occupancy data from in-bed pressure/IR sensors would be
+          ingested via Azure IoT Hub, processed by Azure Stream Analytics, and then used to
+          drive this visualization and power predictive models built with Azure Machine Learning.
+        </p>
+        <p className="mt-2 text-xs">
+          <span className="font-bold">Disclaimer:</span> This is a simulated environment and should not be used for actual hospital operational decisions.
+        </p>
+      </section>
+
+      {/* Footer Section */}
+      <footer className="text-center mt-8 text-gray-500 text-sm">
+        <p>&copy; {new Date().getFullYear()} IoT-Driven Hospital Bed Analytics. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+}
+
+export default App;
