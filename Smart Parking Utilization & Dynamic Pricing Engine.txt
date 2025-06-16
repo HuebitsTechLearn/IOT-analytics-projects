@@ -1,0 +1,196 @@
+import React, { useState, useEffect } from 'react';
+
+// Define parking slot statuses and their colors
+const PARKING_STATUS = {
+  AVAILABLE: 'available',
+  OCCUPIED: 'occupied',
+};
+
+const STATUS_COLORS = {
+  [PARKING_STATUS.AVAILABLE]: 'bg-green-500 hover:bg-green-600',
+  [PARKING_STATUS.OCCUPIED]: 'bg-red-500 hover:bg-red-600',
+};
+
+// Simulate parking zones and slots within each zone
+const ZONES = [
+  { id: 'A', name: 'Downtown', capacity: 20, basePrice: 2.00 },
+  { id: 'B', name: 'Commercial Hub', capacity: 30, basePrice: 1.50 },
+  { id: 'C', name: 'Residential Area', capacity: 15, basePrice: 1.00 },
+];
+
+const App = () => {
+  const [parkingZones, setParkingZones] = useState([]);
+  const [overallOccupancy, setOverallOccupancy] = useState(0);
+  const [demandForecast, setDemandForecast] = useState('Moderate demand expected.');
+
+  // Initialize parking zones with random initial states
+  useEffect(() => {
+    const initialZones = ZONES.map(zone => {
+      const slots = Array.from({ length: zone.capacity }).map((_, index) => ({
+        id: `${zone.id}-${index + 1}`,
+        status: Math.random() < 0.6 ? PARKING_STATUS.OCCUPIED : PARKING_STATUS.AVAILABLE, // 60% initially occupied
+      }));
+      return { ...zone, slots };
+    });
+    setParkingZones(initialZones);
+    updateOverallStats(initialZones);
+  }, []);
+
+  /**
+   * Simulates real-time parking activity and dynamic pricing updates.
+   * In a real system, this would come from IoT sensors and a backend ML model.
+   */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setParkingZones(prevZones => {
+        const updatedZones = prevZones.map(zone => {
+          const newSlots = zone.slots.map(slot => {
+            let newStatus = slot.status;
+            // Simulate car leaving (occupied -> available)
+            if (slot.status === PARKING_STATUS.OCCUPIED && Math.random() < 0.15) { // 15% chance to leave
+              newStatus = PARKING_STATUS.AVAILABLE;
+            }
+            // Simulate car arriving (available -> occupied)
+            else if (slot.status === PARKING_STATUS.AVAILABLE && Math.random() < 0.1) { // 10% chance to arrive
+              newStatus = PARKING_STATUS.OCCUPIED;
+            }
+            return { ...slot, status: newStatus };
+          });
+
+          // Recalculate dynamic price for the zone based on simulated occupancy
+          const occupiedCount = newSlots.filter(s => s.status === PARKING_STATUS.OCCUPIED).length;
+          const currentOccupancy = (occupiedCount / zone.capacity) * 100;
+          let dynamicPrice = zone.basePrice;
+
+          if (currentOccupancy > 90) { // High demand
+            dynamicPrice = zone.basePrice * 1.5;
+          } else if (currentOccupancy > 70) { // Medium demand
+            dynamicPrice = zone.basePrice * 1.2;
+          } else if (currentOccupancy < 30) { // Low demand
+            dynamicPrice = zone.basePrice * 0.8;
+          }
+          dynamicPrice = parseFloat(dynamicPrice.toFixed(2)); // Format to 2 decimal places
+
+          return { ...zone, slots: newSlots, currentOccupancy, dynamicPrice };
+        });
+        updateOverallStats(updatedZones); // Update overall stats after zone updates
+        return updatedZones;
+      });
+
+      // Simulate demand forecast based on time of day (simplified)
+      const currentHour = new Date().getHours();
+      if (currentHour >= 8 && currentHour < 10) {
+        setDemandForecast('HIGH demand expected (Morning Rush Hour)');
+      } else if (currentHour >= 12 && currentHour < 14) {
+        setDemandForecast('PEAK demand expected (Lunchtime)');
+      } else if (currentHour >= 17 && currentHour < 19) {
+        setDemandForecast('HIGH demand expected (Evening Commute)');
+      } else if (currentHour >= 22 || currentHour < 6) {
+        setDemandForecast('LOW demand expected (Overnight)');
+      } else {
+        setDemandForecast('Moderate demand expected.');
+      }
+
+    }, 3000); // Update every 3 seconds
+
+    return () => clearInterval(interval); // Cleanup on component unmount
+  }, []);
+
+  /**
+   * Calculates overall occupancy and updates state.
+   */
+  const updateOverallStats = (currentZones) => {
+    let totalOccupied = 0;
+    let totalCapacity = 0;
+    currentZones.forEach(zone => {
+      totalOccupied += zone.slots.filter(slot => slot.status === PARKING_STATUS.OCCUPIED).length;
+      totalCapacity += zone.capacity;
+    });
+    setOverallOccupancy(((totalOccupied / totalCapacity) * 100).toFixed(1));
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-gray-100 font-inter p-4 sm:p-8 rounded-lg shadow-xl">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <script src="https://cdn.tailwindcss.com"></script>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+
+      {/* Header Section */}
+      <header className="text-center mb-8">
+        <h1 className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-600 mb-2">
+          Smart Parking Utilization & Dynamic Pricing
+        </h1>
+        <p className="text-lg text-gray-300">Intelligent Parking Management for Urban Areas</p>
+      </header>
+
+      {/* Overall Stats Section */}
+      <section className="bg-gray-800 p-6 rounded-lg shadow-lg border border-blue-700 mb-8">
+        <h2 className="text-2xl sm:text-3xl font-bold text-center text-blue-300 mb-3">
+          Overall City Parking Occupancy: <span className="text-blue-400">{overallOccupancy}%</span>
+        </h2>
+        <p className={`text-xl text-center font-medium ${overallOccupancy > 70 ? 'text-orange-400' : 'text-green-400'}`}>
+          <span className="font-semibold text-purple-400">Demand Forecast:</span> {demandForecast}
+        </p>
+      </section>
+
+      {/* Parking Zones Section */}
+      {parkingZones.map(zone => (
+        <section key={zone.id} className="mb-8 p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+          <h2 className="text-2xl font-bold text-gray-200 mb-4 flex items-center justify-between">
+            {zone.name} Parking (Zone {zone.id})
+            <span className={`text-xl font-semibold px-3 py-1 rounded-full
+                ${zone.currentOccupancy > 70 ? 'bg-red-500' : zone.currentOccupancy > 40 ? 'bg-yellow-500 text-gray-900' : 'bg-green-500'}`}>
+              {zone.currentOccupancy}% Occupied
+            </span>
+          </h2>
+          <p className="text-xl text-gray-300 mb-4">
+            Current Price: <span className="font-bold text-yellow-400">${zone.dynamicPrice.toFixed(2)}</span> / hour
+            <span className="ml-4 text-sm text-gray-400">(Base: ${zone.basePrice.toFixed(2)})</span>
+          </p>
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(auto-fill, minmax(3rem, 1fr))` }}>
+            {zone.slots.map(slot => (
+              <div
+                key={slot.id}
+                className={`w-12 h-12 flex items-center justify-center text-xs text-white font-semibold rounded-md shadow-sm transition-colors duration-300
+                  ${STATUS_COLORS[slot.status]}`}
+                title={`Slot ${slot.id}: ${slot.status === PARKING_STATUS.OCCUPIED ? 'Occupied' : 'Available'}`}
+              >
+                {slot.id.split('-')[1]}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      {/* Legend */}
+      <section className="mb-8 p-6 bg-gray-800 rounded-lg shadow-lg border border-gray-700">
+        <h2 className="text-2xl font-bold text-gray-200 mb-4 text-center">Parking Slot Status Legend</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-center">
+          <div className="p-3 rounded-md bg-green-500 text-white font-semibold">Available</div>
+          <div className="p-3 rounded-md bg-red-500 text-white font-semibold">Occupied</div>
+        </div>
+      </section>
+
+      {/* System Information / Disclaimer */}
+      <section className="bg-gray-800 p-6 rounded-lg shadow-lg border border-gray-700 text-gray-400 text-sm italic">
+        <h3 className="text-lg font-semibold mb-2 text-gray-200">System Information:</h3>
+        <p>
+          This dashboard provides a conceptual simulation of a Smart Parking Utilization & Dynamic Pricing Engine.
+          In a complete system, real-time parking slot data from ultrasonic/RFID sensors would be ingested
+          via AWS IoT Core, stored in DynamoDB, and processed by AWS Lambda. Predictive models in AWS SageMaker
+          would forecast demand and dynamically adjust pricing.
+        </p>
+        <p className="mt-2 text-xs">
+          <span className="font-bold">Disclaimer:</span> This is a simulated environment and should not be used for actual parking operations or pricing.
+        </p>
+      </section>
+
+      {/* Footer Section */}
+      <footer className="text-center mt-8 text-gray-500 text-sm">
+        <p>&copy; {new Date().getFullYear()} Smart Parking Solutions. All rights reserved.</p>
+      </footer>
+    </div>
+  );
+};
+
+export default App;
